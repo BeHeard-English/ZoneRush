@@ -1235,6 +1235,7 @@ function onFaceDetectionResults(results) {
 
 // ── Resolve player for a hand at mirrored screen-X ────────────
 function resolvePlayerForHand(sx) {
+  if (soloMode) return 1;  // solo: mọi tay đều thuộc player 1
   if (detectedFaces.length > 0) {
     // Find nearest face (use a generous 55% width threshold)
     let nearest = null, minDist = Infinity;
@@ -1343,7 +1344,9 @@ function onHandResults(results) {
     if (hs.player === null) continue;
 
     const ghostAlpha = Math.max(0, 1 - age / HAND_GHOST_MS);
-    const inZone = hs.player === 1 ? hs.smoothX < W / 2 : hs.smoothX >= W / 2;
+    const inZone = soloMode
+      ? true  // solo: toàn màn hình đều hợp lệ
+      : (hs.player === 1 ? hs.smoothX < W / 2 : hs.smoothX >= W / 2);
 
     handPositions.push({
       x: hs.smoothX, y: hs.smoothY,
@@ -2177,13 +2180,20 @@ function drawHandLockStatus(W, H) {
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.font         = '700 11px Nunito';
-  const faceCol    = faceCount >= 2 ? '#40e070' : faceCount === 1 ? '#ffcc00' : '#ff4040';
-  ctx.fillStyle    = faceCol;
-  ctx.shadowColor  = faceCol;
-  ctx.shadowBlur   = faceCount > 0 ? 8 : 0;
-  const faceLabel  = faceCount === 0 ? '😶 Chưa thấy mặt'
-                   : faceCount === 1 ? '😊 1 người — cần 2'
-                   : '😊😊 2 mặt đã nhận diện';
+
+  let faceCol, faceLabel;
+  if (soloMode) {
+    faceCol   = faceCount >= 1 ? '#40e070' : '#ff4040';
+    faceLabel = faceCount === 0 ? '😶 Chưa thấy mặt' : '😊 Đã nhận diện';
+  } else {
+    faceCol   = faceCount >= 2 ? '#40e070' : faceCount === 1 ? '#ffcc00' : '#ff4040';
+    faceLabel = faceCount === 0 ? '😶 Chưa thấy mặt'
+              : faceCount === 1 ? '😊 1 người — cần 2'
+              : '😊😊 2 mặt đã nhận diện';
+  }
+  ctx.fillStyle  = faceCol;
+  ctx.shadowColor = faceCol;
+  ctx.shadowBlur  = faceCount > 0 ? 8 : 0;
   ctx.fillText(faceLabel, W / 2, 62);
   ctx.shadowBlur = 0;
   ctx.restore();
@@ -2195,9 +2205,10 @@ function drawHandLockStatus(W, H) {
     if (hs.player) assigned[hs.player] = true;
   }
 
-  [1, 2].forEach(num => {
+  const players = soloMode ? [1] : [1, 2];
+  players.forEach(num => {
     const col  = num === 1 ? COLORS.p1 : COLORS.p2;
-    const cx   = num === 1 ? W / 4 : W * 3 / 4;
+    const cx   = soloMode ? W / 2 : (num === 1 ? W / 4 : W * 3 / 4);
     const cy   = H - 100;
     const isOk = assigned[num];
 
@@ -2208,7 +2219,10 @@ function drawHandLockStatus(W, H) {
     ctx.fillStyle    = isOk ? hexAlpha(col, .7) : hexAlpha('#ffffff', .2);
     ctx.shadowColor  = isOk ? col : 'transparent';
     ctx.shadowBlur   = isOk ? 8 : 0;
-    ctx.fillText(isOk ? `🔒 P${num} tay đã khóa` : `✋ P${num} giơ tay lên`, cx, cy);
+    const lockLabel  = soloMode
+      ? (isOk ? '🔒 Tay đã khóa' : '✋ Giơ tay lên')
+      : (isOk ? `🔒 P${num} tay đã khóa` : `✋ P${num} giơ tay lên`);
+    ctx.fillText(lockLabel, cx, cy);
     ctx.restore();
   });
 }
